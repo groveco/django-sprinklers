@@ -19,10 +19,7 @@ class ActionValidationException(Exception):
 
 class Sprinkle(object):
 
-    klass = models.Model
-    qs = models.QuerySet()
-
-    def __init__(self, obj_id):
+    def __init__(self, obj_id, *args, **kwargs):
         self.obj = self.klass.objects.get(pk=obj_id)
 
     def validate(self):
@@ -60,13 +57,6 @@ class Sprinkle(object):
                        % (self, self.klass.__name__, self.obj.pk, e))
             self._log(self.failed_validation)
 
-    @classmethod
-    def create_sprinkles(cls):
-        # Force a refresh of the QuerySet. Using cls.qs directly will use the QuerySet._result_cache if it's available.
-        fresh_qs = models.QuerySet(model=cls.klass, query=cls.qs.query)
-        for obj in fresh_qs:
-            run_sprinkle.delay(obj.pk, cls.__name__)
-
     def _log(self, fn):
         logger.info("SPRINKLE: %s.%s is starting for object <%s - %s>."
                     % (self, fn.__name__, self.klass.__name__, self.obj.pk))
@@ -77,3 +67,19 @@ class Sprinkle(object):
 
     def __unicode__(self):
         str(self.__class__.__name__)
+
+    #####
+    # Below is metadata and metamethods to handle the Sprinkle job. Everything above relates to a single sprinkle.
+    #####
+
+    klass = models.Model
+
+    @classmethod
+    def qs(cls, *args, **kwargs):
+        raise NotImplementedError
+
+    @classmethod
+    def create_sprinkles(cls, *args, **kwargs):
+        for obj in cls.qs(*args, **kwargs):
+            run_sprinkle.delay(obj.pk, cls.__name__)
+

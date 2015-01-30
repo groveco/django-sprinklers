@@ -5,14 +5,17 @@ from celery import task
 
 
 @task
-def run_sample_sprinkle():
-    SampleSprinkle.create_sprinkles()
+def run_sample_sprinkle(**kwargs):
+    SampleSprinkle.create_sprinkles(**kwargs)
 
 
 class SampleSprinkle(Sprinkle):
 
     klass = DummyModel
-    qs = DummyModel.objects.all()
+
+    @classmethod
+    def qs(cls, **kwargs):
+        return DummyModel.objects.filter(**kwargs).all()
 
     def perform(self):
         self.obj.name = "Sprinkled!"
