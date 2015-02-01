@@ -56,7 +56,6 @@ class SprinklerTest(TestCase):
         self.assertIn('subtask', str(mocked_log.call_args[0][0]))
         self.assertEqual(d, mocked_log.call_args[0][1])
 
-
     def test_validation_exception(self):
         DummyModel(name="foo").save()
         run_sample_sprinkler(fail=True)
