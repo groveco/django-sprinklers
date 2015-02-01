@@ -1,4 +1,4 @@
-from sprinklers.base import SprinklerBase, registry
+from sprinklers.base import SprinklerBase, registry, SubtaskValidationException
 from sample.models import DummyModel
 from celery import task
 
@@ -24,6 +24,10 @@ class SampleSprinkler(SprinklerBase):
         obj.name = "Sprinkled!"
         obj.save()
         return True
+
+    def validate(self, obj):
+        if self.kwargs.get('fail'):
+            raise SubtaskValidationException
 
     def finished(self, results):
         self.results = results

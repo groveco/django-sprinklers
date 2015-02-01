@@ -18,7 +18,7 @@ def _sprinkler_finished_wrap(results, sprinkler):
     sprinkler.finished(results)
 
 
-class ActionValidationException(Exception):
+class SubtaskValidationException(Exception):
     pass
 
 
@@ -57,8 +57,8 @@ class SprinklerBase(object):
         try:
             self._log(self.validate, obj)
             return self._log(self.subtask, obj)
-        except ActionValidationException as e:
-            logger.log("SPRINKLE: %s validation exception for %s with id %s: %s"
+        except SubtaskValidationException as e:
+            logger.info("SPRINKLE: %s validation exception for %s with id %s: %s"
                        % (self, self.klass.__name__, obj.pk, e))
 
     def _log(self, fn, obj):
