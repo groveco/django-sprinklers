@@ -1,85 +1,71 @@
 import logging
-from celery import task
-from django.db import models
-from registry import sprinkle_registry
+from celery import task, chord
+from registry import sprinkler_registry
 
 
 logger = logging.getLogger(__name__)
 
 
 @task
-def run_sprinkle(obj_pk, action_name):
-    a = sprinkle_registry[action_name](obj_pk)
-    a.run()
+def _run_sprinkle(obj_pk, action_name):
+    return sprinkler_registry[action_name]._run_subtask(obj_pk)
+
+
+@task
+def _sprinkler_finished_wrap(results, sprinkler):
+    sprinkler.finished(results)
 
 
 class ActionValidationException(Exception):
     pass
 
 
-class Sprinkle(object):
+class SprinklerBase(object):
 
-    def __init__(self, obj_id, *args, **kwargs):
-        self.obj = self.klass.objects.get(pk=obj_id)
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        sprinkler_registry.register(self)
+        self.klass = self.get_queryset().model
+        c = chord(
+            (_run_sprinkle.s(obj.pk, self.__class__.__name__) for obj in self.get_queryset()),
+            _sprinkler_finished_wrap.s(sprinkler=self)
+        )
+        self._job = c
 
-    def validate(self):
+    def start(self):
+        self._job.apply_async()
+
+    def finished(self, results):
+        pass
+
+    def get_queryset(self):
+        raise NotImplementedError
+
+    def validate(self, obj):
         """Should raise ActionValidationException if validation fails."""
         pass
 
-    def failed_validation(self):
-        pass
-
-    def perform(self):
-        """Must return True for success or False for failure. This method should not throw exceptions."""
+    def subtask(self, obj):
+        """ Do work on obj and return whatever results are needed."""
         raise NotImplementedError
 
-    def failed(self):
-        pass
-
-    def succeeded(self):
-        pass
-
-    def finished(self):
-        pass
-
-    def run(self):
+    def _run_subtask(self, obj_pk):
         """Executes the sprinkle pipeline. Should not be overridden."""
+        obj = self.klass.objects.get(pk=obj_pk)
         try:
-            self._log(self.validate)
-            res = self._log(self.perform)
-            self._log(self.finished)
-            if res:
-                self._log(self.succeeded)
-            else:
-                self._log(self.failed)
+            self._log(self.validate, obj)
+            return self._log(self.subtask, obj)
         except ActionValidationException as e:
             logger.log("SPRINKLE: %s validation exception for %s with id %s: %s"
-                       % (self, self.klass.__name__, self.obj.pk, e))
-            self._log(self.failed_validation)
+                       % (self, self.klass.__name__, obj.pk, e))
 
-    def _log(self, fn):
+    def _log(self, fn, obj):
         logger.info("SPRINKLE: %s.%s is starting for object <%s - %s>."
-                    % (self, fn.__name__, self.klass.__name__, self.obj.pk))
-        res = fn()
+                    % (self, fn.__name__, self.klass.__name__, obj.pk))
+        res = fn(obj)
         logger.info("SPRINKLE: %s.%s has finished for object <%s - %s>."
-                    % (self, fn.__name__, self.klass.__name__, self.obj.pk))
+                    % (self, fn.__name__, self.klass.__name__, obj.pk))
         return res
 
     def __unicode__(self):
         str(self.__class__.__name__)
-
-    #####
-    # Below is metadata and metamethods to handle the Sprinkle job. Everything above relates to a single sprinkle.
-    #####
-
-    klass = models.Model
-
-    @classmethod
-    def qs(cls, *args, **kwargs):
-        raise NotImplementedError
-
-    @classmethod
-    def create_sprinkles(cls, *args, **kwargs):
-        for obj in cls.qs(*args, **kwargs):
-            run_sprinkle.delay(obj.pk, cls.__name__)
-
