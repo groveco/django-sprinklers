@@ -13,6 +13,7 @@ def _run_sprinkle(obj_pk, action_name):
 
 @task
 def _sprinkler_finished_wrap(results, sprinkler):
+    logger.info("SPRINKLER: Finished %s with results (length %s): %s" % (sprinkler, len(results), results))
     sprinkler.finished(results)
 
 
@@ -33,6 +34,7 @@ class SprinklerBase(object):
         self._job = c
 
     def start(self):
+        logger.info("SPRINKLER: Started %s." % self)
         self._job.apply_async()
 
     def finished(self, results):
@@ -68,4 +70,4 @@ class SprinklerBase(object):
         return res
 
     def __unicode__(self):
-        str(self.__class__.__name__)
+        return "%s - %s" % (str(self.__class__.__name__), self.kwargs)
