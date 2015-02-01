@@ -1,6 +1,6 @@
 import os
 from setuptools import setup
-from sprinkles import __version__
+from sprinklers import __version__
 
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
@@ -11,15 +11,15 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-    name = "django-sprinkles",
+    name = "django-sprinklers",
     version = __version__,
     author = "Chris Clark",
     author_email = "chris@untrod.com",
     description = ("A simple framework for bulletproof distributed tasks with Django and Celery."),
     license = "MIT",
-    keywords = "django celery sprinkles sprinkle distributed tasks",
-    url = "https://github.com/chrisclark/django-sprinkles",
-    packages=['sprinkles'],
+    keywords = "django celery sprinklers sprinkler distributed tasks",
+    url = "https://github.com/chrisclark/django-sprinklers",
+    packages=['sprinklers'],
     long_description=read('README.rst'),
     classifiers=[
         "Topic :: Utilities",

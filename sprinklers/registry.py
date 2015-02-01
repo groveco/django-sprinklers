@@ -1,7 +1,4 @@
 class SprinklerRegistry(object):
-    """
-    Imported in sprinkles.__init__
-    """
 
     def __init__(self):
         self._registry = {}

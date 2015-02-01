@@ -1,10 +1,10 @@
-from sprinkles.base import SprinklerBase, registry
+from sprinklers.base import SprinklerBase, registry
 from sample.models import DummyModel
 from celery import task
 
 
 @task
-def run_sample_sprinkle(**kwargs):
+def run_sample_sprinkler(**kwargs):
     SampleSprinkler(**kwargs).start()
 
 
