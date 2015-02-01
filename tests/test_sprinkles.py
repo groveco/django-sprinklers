@@ -1,10 +1,10 @@
 from django.test import TestCase
 from sample.models import DummyModel
 from sample.sprinklers import run_sample_sprinkle, SampleSprinkler
-from mock import Mock
+from mock import Mock, patch
 
 
-class SprinkleTest(TestCase):
+class SprinklerTest(TestCase):
 
     def test_objects_get_sprinkled(self):
         DummyModel(name="foo").save()
@@ -48,13 +48,10 @@ class SprinkleTest(TestCase):
 
         self.assertItemsEqual(s.results, [True, True])
 
-    def test_logging_succeeded(self):
+    @patch('sample.sprinklers.SampleSprinkler._log')
+    def test_logging_succeeded(self, mocked_log):
         d = DummyModel(name="foo")
         d.save()
-        s = SampleSprinkler()
-        s._log = Mock()
-
-        s._log.return_value = False
-        s.start()
-        s._log.assert_called_with(s.subtask, d)
-        self.assertEqual(s._log.call_count, 2)
+        SampleSprinkler().start()
+        self.assertIn('subtask', str(mocked_log.call_args[0][0]))
+        self.assertEqual(d, mocked_log.call_args[0][1])

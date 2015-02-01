@@ -1,4 +1,4 @@
-from sprinkles.base import SprinklerBase
+from sprinkles.base import SprinklerBase, registry
 from sample.models import DummyModel
 from celery import task
 
@@ -27,3 +27,5 @@ class SampleSprinkler(SprinklerBase):
 
     def finished(self, results):
         self.results = results
+
+registry.register(SampleSprinkler)

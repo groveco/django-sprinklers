@@ -1,14 +1,15 @@
 import logging
 from celery import task, chord
-from registry import sprinkler_registry
+from registry import sprinkler_registry as registry
 
 
 logger = logging.getLogger(__name__)
 
 
 @task
-def _run_sprinkle(obj_pk, action_name):
-    return sprinkler_registry[action_name]._run_subtask(obj_pk)
+def _run_sprinkle(obj_pk, sprinkler_name, kwargs):
+    sprinkler = registry[sprinkler_name](**kwargs)
+    return sprinkler._run_subtask(obj_pk)
 
 
 @task
@@ -25,10 +26,9 @@ class SprinklerBase(object):
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
-        sprinkler_registry.register(self)
         self.klass = self.get_queryset().model
         c = chord(
-            (_run_sprinkle.s(obj.pk, self.__class__.__name__) for obj in self.get_queryset()),
+            (_run_sprinkle.s(obj.pk, self.__class__.__name__, self.kwargs) for obj in self.get_queryset()),
             _sprinkler_finished_wrap.s(sprinkler=self)
         )
         self._job = c
