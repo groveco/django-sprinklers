@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/1.7/ref/settings/
 """
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-import os
+import os, sys
 import djcelery
 djcelery.setup_loader()
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -55,13 +55,28 @@ MIDDLEWARE_CLASSES = (
 
 # Database
 # https://docs.djangoproject.com/en/1.7/ref/settings/#databases
+#
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#         'TEST_NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#     }
+# }
+
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'sprinklers',
+        'TEST_NAME': 'sprinklers',
+        'USER': 'postgres',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    },
 }
+
+DISABLE_TRANSACTION_MANAGEMENT = True
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.7/topics/i18n/
@@ -86,5 +101,37 @@ TEMPLATE_DIRS = (
     os.path.join(BASE_DIR, 'templates'),
 )
 
-CELERY_ALWAYS_EAGER = True
+CELERY_ALWAYS_EAGER = False
+CELERYD_HIJACK_ROOT_LOGGER = False
 BROKER_URL = 'redis://localhost:6379/0'
+
+from celery.signals import setup_logging
+@setup_logging.connect
+def configure_logging(sender=None, **kwargs):
+    import logging
+    import logging.config
+    logging.config.dictConfig(LOGGING)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': True,
+    'formatters': {
+        'simple': {
+            'format': '%(levelname)s %(message)s',
+             'datefmt': '%y %b %d, %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    }
+}

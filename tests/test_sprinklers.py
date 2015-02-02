@@ -1,16 +1,23 @@
-from django.test import TestCase
+from django.test import TransactionTestCase
 from sample.models import DummyModel
 from sample.tasks import run_sample_sprinkler, SampleSprinkler
-from mock import patch
+import time
 
 
-class SprinklerTest(TestCase):
+class SprinklerTest(TransactionTestCase):
+
+    @classmethod
+    def tearDown(self):
+        time.sleep(1)
+
+    def _run(self, **kwargs):
+        run_sample_sprinkler.delay(**kwargs)
+        time.sleep(1)
 
     def test_objects_get_sprinkled(self):
         DummyModel(name="foo").save()
         DummyModel(name="foo").save()
-        run_sample_sprinkler()
-
+        self._run()
         for d in DummyModel.objects.all():
             self.assertEqual(d.name, "Sprinkled!")
 
@@ -25,7 +32,7 @@ class SprinklerTest(TestCase):
         for i in xrange(cur_len + 5):
             DummyModel(name="foo").save()
 
-        run_sample_sprinkler()
+        self._run()
 
         for d in DummyModel.objects.all():
             self.assertEqual(d.name, "Sprinkled!")
@@ -35,7 +42,7 @@ class SprinklerTest(TestCase):
         DummyModel(name="qux").save()
         DummyModel(name="mux").save()
 
-        run_sample_sprinkler(name="qux")
+        self._run(name="qux")
         self.assertFalse(DummyModel.objects.filter(name="qux").exists())
         self.assertTrue(DummyModel.objects.filter(name="mux").exists())
 
@@ -43,20 +50,12 @@ class SprinklerTest(TestCase):
         DummyModel(name="qux").save()
         DummyModel(name="mux").save()
 
-        s = SampleSprinkler()
+        s = SampleSprinkler(persist_results=True)
         s.start()
-
-        self.assertItemsEqual(s.results, [True, True])
-
-    @patch('sample.tasks.SampleSprinkler._log')
-    def test_logging_succeeded(self, mocked_log):
-        d = DummyModel(name="foo")
-        d.save()
-        run_sample_sprinkler()
-        self.assertIn('subtask', str(mocked_log.call_args[0][0]))
-        self.assertEqual(d, mocked_log.call_args[0][1])
+        time.sleep(2)
+        self.assertEqual(DummyModel.objects.filter(name=str([True, True])).count(), 1)
 
     def test_validation_exception(self):
         DummyModel(name="foo").save()
-        run_sample_sprinkler(fail=True)
+        self._run(fail=True)
         self.assertTrue(DummyModel.objects.filter(name="foo").exists())

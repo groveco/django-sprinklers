@@ -1,18 +1,17 @@
-import logging
-from celery import task, chord
+from celery import chord, current_app
 from registry import sprinkler_registry as registry
-
+import logging
 
 logger = logging.getLogger(__name__)
 
 
-@task
-def _run_sprinkle(obj_pk, sprinkler_name, kwargs):
+@current_app.task()
+def _async_subtask(obj_pk, sprinkler_name, kwargs):
     sprinkler = registry[sprinkler_name](**kwargs)
     return sprinkler._run_subtask(obj_pk)
 
 
-@task
+@current_app.task()
 def _sprinkler_finished_wrap(results, sprinkler):
     logger.info("SPRINKLER: Finished %s with results (length %s): %s" % (sprinkler, len(results), results))
     sprinkler.finished(results)
@@ -27,15 +26,15 @@ class SprinklerBase(object):
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.klass = self.get_queryset().model
-        c = chord(
-            (_run_sprinkle.s(obj.pk, self.__class__.__name__, self.kwargs) for obj in self.get_queryset()),
-            _sprinkler_finished_wrap.s(sprinkler=self)
-        )
-        self._job = c
 
     def start(self):
-        logger.info("SPRINKLER: Started %s." % self)
-        self._job.apply_async()
+        qs = self.get_queryset()
+        c = chord(
+            (_async_subtask.s(obj.pk, self.__class__.__name__, self.kwargs) for obj in qs),
+            _sprinkler_finished_wrap.s(sprinkler=self)
+        )
+        logger.info("SPRINKLER: Started %s with %s objects." % (self, len(qs)))
+        c.apply_async()
 
     def finished(self, results):
         pass
@@ -58,15 +57,16 @@ class SprinklerBase(object):
             self._log(self.validate, obj)
             return self._log(self.subtask, obj)
         except SubtaskValidationException as e:
-            logger.info("SPRINKLE: %s validation exception for %s with id %s: %s"
-                       % (self, self.klass.__name__, obj.pk, e))
+            logger.info("SPRINKLER %s: Validation failed for object %s: %s"
+                       % (self, obj, e))
 
     def _log(self, fn, obj):
-        logger.info("SPRINKLE: %s.%s is starting for object <%s - %s>."
-                    % (self, fn.__name__, self.klass.__name__, obj.pk))
+        fn_name = fn.__name__.split('.')[-1]
+        logger.info("SPRINKLER %s: %s is starting for object %s."
+                    % (self, fn_name, obj))
         res = fn(obj)
-        logger.info("SPRINKLE: %s.%s has finished for object <%s - %s>."
-                    % (self, fn.__name__, self.klass.__name__, obj.pk))
+        logger.info("SPRINKLER %s: %s has finished for object %s."
+                    % (self, fn_name, obj))
         return res
 
     def __unicode__(self):

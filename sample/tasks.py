@@ -30,6 +30,9 @@ class SampleSprinkler(SprinklerBase):
             raise SubtaskValidationException
 
     def finished(self, results):
-        self.results = results
+        # Persist results to an external source (the database) so I can unit test this.
+        if self.kwargs.get('persist_results'):
+            DummyModel(name="%s" % results).save()
+
 
 registry.register(SampleSprinkler)
