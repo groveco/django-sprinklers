@@ -69,5 +69,5 @@ class SprinklerBase(object):
                     % (self, fn_name, obj))
         return res
 
-    def __unicode__(self):
+    def __repr__(self):
         return "%s - %s" % (str(self.__class__.__name__), self.kwargs)
