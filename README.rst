@@ -51,7 +51,7 @@ Use Sprinklers to impose structure and make these jobs testable.
 
 # tasks.py
 
-from sprinklers.base import SprinklerBase, registry
+from sprinklers.base import SprinklerBase, registry, SubtaskValidationException
 
 class ItemUpdateSprinkler(SprinklerBase):
 
