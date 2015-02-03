@@ -2,7 +2,7 @@ from celery import chord, current_app
 from registry import sprinkler_registry as registry
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('')
 
 
 @current_app.task()
@@ -52,10 +52,12 @@ class SprinklerBase(object):
 
     def _run_subtask(self, obj_pk):
         """Executes the sprinkle pipeline. Should not be overridden."""
-        obj = self.klass.objects.get(pk=obj_pk)
         try:
+            obj = self.klass.objects.get(pk=obj_pk)
             self._log(self.validate, obj)
             return self._log(self.subtask, obj)
+        except self.klass.DoesNotExist:
+            logger.info("SPRINKLER %s: Object <%s - %s> does not exist." % (self, self.klass.__name__, obj_pk))
         except SubtaskValidationException as e:
             logger.info("SPRINKLER %s: Validation failed for object %s: %s"
                        % (self, obj, e))

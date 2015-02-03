@@ -116,22 +116,22 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
     'formatters': {
-        'simple': {
-            'format': '%(levelname)s %(message)s',
-             'datefmt': '%y %b %d, %H:%M:%S',
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
         },
     },
     'handlers': {
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
-            'stream': sys.stdout
+            'formatter': 'verbose'
         },
     },
     'loggers': {
         '': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': True
         },
     }
 }

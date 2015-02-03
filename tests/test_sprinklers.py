@@ -8,11 +8,11 @@ class SprinklerTest(TransactionTestCase):
 
     @classmethod
     def tearDown(self):
-        time.sleep(1)
+        time.sleep(2)
 
     def _run(self, **kwargs):
         run_sample_sprinkler.delay(**kwargs)
-        time.sleep(1)
+        time.sleep(2)
 
     def test_objects_get_sprinkled(self):
         DummyModel(name="foo").save()
@@ -49,10 +49,7 @@ class SprinklerTest(TransactionTestCase):
     def test_sprinkler_finished(self):
         DummyModel(name="qux").save()
         DummyModel(name="mux").save()
-
-        s = SampleSprinkler(persist_results=True)
-        s.start()
-        time.sleep(2)
+        self._run(persist_results=True)
         self.assertEqual(DummyModel.objects.filter(name=str([True, True])).count(), 1)
 
     def test_validation_exception(self):
