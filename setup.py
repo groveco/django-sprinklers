@@ -20,7 +20,7 @@ setup(
     keywords = "django celery sprinklers sprinkler distributed tasks",
     url = "https://github.com/chrisclark/django-sprinklers",
     packages=['sprinklers'],
-    long_description=read('README.rst'),
+    long_description=read('README.md'),
     classifiers=[
         "Topic :: Utilities",
     ],
