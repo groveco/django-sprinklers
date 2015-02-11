@@ -55,7 +55,9 @@ class SprinklerBase(object):
         try:
             obj = self.klass.objects.get(pk=obj_pk)
             self._log(self.validate, obj)
-            return self._log(self.subtask, obj)
+            # if subtask() doesn't return a value, return the object id so something more helpful than None
+            # gets aggregated into the results object (passed to 'finish').
+            return self._log(self.subtask, obj) or obj.id
         except self.klass.DoesNotExist:
             logger.info("SPRINKLER %s: Object <%s - %s> does not exist." % (self, self.klass.__name__, obj_pk))
         except SubtaskValidationException as e:

@@ -38,7 +38,7 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'sample',
+    'tests',
     'djcelery',
 )
 
@@ -101,6 +101,7 @@ TEMPLATE_DIRS = (
     os.path.join(BASE_DIR, 'templates'),
 )
 
+# Change to True to run in a single thread for easier debugging
 CELERY_ALWAYS_EAGER = False
 CELERYD_HIJACK_ROOT_LOGGER = False
 BROKER_URL = 'redis://localhost:6379/0'

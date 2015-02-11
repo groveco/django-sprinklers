@@ -87,13 +87,31 @@ def start_item_sprinkler():
 
 ```
 
-You can also pass **kwargs into the Sprinkler's start() function, which will be accessible downstream to all Sprinkler methods. See tasks.py in /Sample for how this works.
+You can also pass **kwargs into the Sprinkler's start() function, which will be accessible downstream to all Sprinkler methods. See tasks.py and models.py in /tests for how this works.
 
+## Testing
+
+The Sprinkler tests are a bit trickier to run that just 'manage.py test' because every attempt has been made to mimic an async production celery environment.
+
+In order to run the tests you will need:
+
+1. A local postgres server set up in line with the DB config in test.settings
+2. A running redis server with default localhost config (redis://localhost:6379/0)
+3. A running celery daemon/worker.
+4. Then run 'python manage.py test'
+
+I find it easiest to run 2 & 3 via:
+
+```
+screen -d -S 'redis' -m redis-server
+screen -d -S 'celery' -m python manage.py celeryd
+```
+
+This will run each in the background, and you can 'screen -r redis' or 'screen -r celery' to view them (Ctrl-a-d to detach).
+
+If you are working on this project directly, remember to restart celery after code changes to django-sprinklers. Celery does not live reload!
 
 ## FAQ
 
 - Q: Will this work on any iterable? Does it have to be a Django queryset?
 - A: It has to be a queryset. Sprinklers relies on some introspection to determine which model class to use for individual object retrieval.
-
-- Q: How do I run the tests?
-- A: run 'python manage.py celeryd --settings=tests.settings' in one terminal and then 'python manage.py test' in another.

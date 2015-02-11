@@ -1,6 +1,6 @@
 from django.test import TransactionTestCase
-from sample.models import DummyModel
-from sample.tasks import run_sample_sprinkler, SampleSprinkler
+from tests.models import DummyModel
+from tests.tasks import run_sample_sprinkler, SampleSprinkler
 import time
 
 
@@ -24,10 +24,12 @@ class SprinklerTest(TransactionTestCase):
     def test_queryset_refreshes_on_each_sprinkling(self):
 
         DummyModel(name="foo").save()
-        run_sample_sprinkler()
+        self._run()
 
         # Make sure we don't incorrectly pass this test through sheer luck by generating the number
-        # of models that happens to match the results cache of SampleSprinkle.qs. Trust me on this one...
+        # of models that happens to match the results cache of the SampleSprinkler queryset.
+        # This was a bigger issue in an earlier version of sprinklers, but it still makes me feel good
+        # knowing that this tests pass and sprinklers will always refresh their querset when they run.
         cur_len = len(SampleSprinkler().get_queryset())
         for i in xrange(cur_len + 5):
             DummyModel(name="foo").save()
@@ -49,10 +51,18 @@ class SprinklerTest(TransactionTestCase):
     def test_sprinkler_finished(self):
         DummyModel(name="qux").save()
         DummyModel(name="mux").save()
-        self._run(persist_results=True)
+        self._run(persist_results=True, special_return=True)
         self.assertEqual(DummyModel.objects.filter(name=str([True, True])).count(), 1)
 
     def test_validation_exception(self):
         DummyModel(name="foo").save()
         self._run(fail=True)
         self.assertTrue(DummyModel.objects.filter(name="foo").exists())
+
+    def test_default_return_value_for_subtask(self):
+        d1 = DummyModel(name="qux")
+        d1.save()
+        d2 = DummyModel(name="mux")
+        d2.save()
+        self._run(persist_results=True)
+        self.assertEqual(DummyModel.objects.filter(name=str([d1.id, d2.id])).count(), 1)
