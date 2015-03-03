@@ -1,6 +1,7 @@
 from django.test import TransactionTestCase
 from tests.models import DummyModel
 from tests.tasks import run_sample_sprinkler, SampleSprinkler
+from django.conf import settings
 import time
 
 
@@ -8,16 +9,25 @@ class SprinklerTest(TransactionTestCase):
 
     @classmethod
     def tearDown(self):
-        time.sleep(2)
+        if not settings.CELERY_ALWAYS_EAGER:
+            time.sleep(2)
 
     def _run(self, **kwargs):
         run_sample_sprinkler.delay(**kwargs)
-        time.sleep(2)
+        if not settings.CELERY_ALWAYS_EAGER:
+            time.sleep(2)
 
     def test_objects_get_sprinkled(self):
         DummyModel(name="foo").save()
         DummyModel(name="foo").save()
         self._run()
+        for d in DummyModel.objects.all():
+            self.assertEqual(d.name, "Sprinkled!")
+
+    def test_works_with_values_queryset(self):
+        DummyModel(name="foo").save()
+        DummyModel(name="foo").save()
+        self._run(values=True)
         for d in DummyModel.objects.all():
             self.assertEqual(d.name, "Sprinkled!")
 

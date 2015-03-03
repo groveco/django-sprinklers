@@ -1,5 +1,6 @@
 from celery import chord, current_app
 from registry import sprinkler_registry as registry
+from django.db.models.query import ValuesQuerySet, QuerySet
 import logging
 
 logger = logging.getLogger('')
@@ -29,11 +30,21 @@ class SprinklerBase(object):
 
     def start(self):
         qs = self.get_queryset()
-        c = chord(
-            (_async_subtask.s(obj.pk, self.__class__.__name__, self.kwargs) for obj in qs),
-            _sprinkler_finished_wrap.s(sprinkler=self)
-        )
-        logger.info("SPRINKLER: Started %s with %s objects." % (self, len(qs)))
+        if isinstance(qs, ValuesQuerySet):
+            c = chord(
+                (_async_subtask.s(obj['id'], self.__class__.__name__, self.kwargs) for obj in qs),
+                _sprinkler_finished_wrap.s(sprinkler=self)
+            )
+        elif isinstance(qs, QuerySet):
+            c = chord(
+                (_async_subtask.s(obj.pk, self.__class__.__name__, self.kwargs) for obj in qs),
+                _sprinkler_finished_wrap.s(sprinkler=self)
+            )
+        else:
+            logger.error("SPRINKLER %s: Invalid queryset. Expected QuerySet of ValuesQuerySet, but got %s." % (self, type(qs)))
+            return
+
+        logger.info("SPRINKLER %s: Started with %s objects." % (self, len(qs)))
         c.apply_async()
 
     def finished(self, results):

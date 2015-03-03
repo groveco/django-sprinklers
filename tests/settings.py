@@ -102,7 +102,7 @@ TEMPLATE_DIRS = (
 )
 
 # Change to True to run in a single thread for easier debugging
-CELERY_ALWAYS_EAGER = False
+CELERY_ALWAYS_EAGER = True
 CELERYD_HIJACK_ROOT_LOGGER = False
 BROKER_URL = 'redis://localhost:6379/0'
 

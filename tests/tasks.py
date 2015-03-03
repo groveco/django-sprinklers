@@ -18,6 +18,8 @@ class SampleSprinkler(SprinklerBase):
         """
         if self.kwargs.get('name', None):
             return DummyModel.objects.filter(name=self.kwargs['name']).all()
+        if self.kwargs.get('values', None):
+            return DummyModel.objects.all().values('id')
         return DummyModel.objects.all()
 
     def subtask(self, obj):
