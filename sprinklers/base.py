@@ -15,7 +15,7 @@ def _async_subtask(obj_pk, sprinkler_name, kwargs):
 
 @current_app.task()
 def _sprinkler_finished_wrap(results, sprinkler):
-    logger.info("SPRINKLER: Finished %s with results (length %s): %s" % (sprinkler, len(results), results))
+    sprinkler.log("Finished with results (length %s): %s" % (len(results), results))
     sprinkler.finished(results)
 
 
@@ -36,7 +36,7 @@ class SprinklerBase(object):
         elif isinstance(qs, QuerySet):
             ids = [obj.pk for obj in qs]
         else:
-            logger.error("SPRINKLER %s: Invalid queryset. Expected QuerySet or ValuesQuerySet, but got %s." % (self, type(qs)))
+            self.log("Invalid queryset. Expected QuerySet or ValuesQuerySet, but got %s." % type(qs))
             return
 
         c = chord(
@@ -49,8 +49,8 @@ class SprinklerBase(object):
         end_time = time()
 
         duration = (end_time - start_time) * 1000
-        logger.info("SPRINKLER %s: Started with %s objects in %sms." % (self, len(qs), duration))
-        logger.info("SPRINKLER %s: Started with objects: %s" % (self, ids))
+        self.log("Started with %s objects in %sms." % (len(qs), duration))
+        self.log("Started with objects: %s" % ids)
 
     def finished(self, results):
         pass
@@ -70,24 +70,24 @@ class SprinklerBase(object):
         """Executes the sprinkle pipeline. Should not be overridden."""
         try:
             obj = self.klass.objects.get(pk=obj_pk)
-            self._log(self.validate, obj)
+            self._log_execution_step(self.validate, obj)
             # if subtask() doesn't return a value, return the object id so something more helpful than None
             # gets aggregated into the results object (passed to 'finish').
-            return self._log(self.subtask, obj) or obj.id
+            return self._log_execution_step(self.subtask, obj) or obj.id
         except self.klass.DoesNotExist:
-            logger.info("SPRINKLER %s: Object <%s - %s> does not exist." % (self, self.klass.__name__, obj_pk))
+            self.log("Object <%s - %s> does not exist." % (self.klass.__name__, obj_pk))
         except SubtaskValidationException as e:
-            logger.info("SPRINKLER %s: Validation failed for object %s: %s"
-                       % (self, obj, e))
+            self.log("Validation failed for object %s: %s" % (obj, e))
 
-    def _log(self, fn, obj):
+    def _log_execution_step(self, fn, obj):
         fn_name = fn.__name__.split('.')[-1]
-        logger.info("SPRINKLER %s: %s is starting for object %s."
-                    % (self, fn_name, obj))
+        self.log("%s is starting for object %s." % (fn_name, obj))
         res = fn(obj)
-        logger.info("SPRINKLER %s: %s has finished for object %s."
-                    % (self, fn_name, obj))
+        self.log("%s has finished for object %s." % (fn_name, obj))
         return res
 
     def __repr__(self):
         return "%s - %s" % (str(self.__class__.__name__), self.kwargs)
+
+    def log(self, msg):
+        logger.info("SPRINKLER %s: %s" % (self, msg))
