@@ -30,7 +30,6 @@ class SprinklerBase(object):
         self.klass = self.get_queryset().model
 
     def start(self):
-        start_time = time()
         qs = self.get_queryset()
         if isinstance(qs, ValuesQuerySet):
             c = chord(
@@ -46,11 +45,12 @@ class SprinklerBase(object):
             logger.error("SPRINKLER %s: Invalid queryset. Expected QuerySet of ValuesQuerySet, but got %s." % (self, type(qs)))
             return
 
-        end_time = time()
-        duration = (end_time - start_time) * 1000
-
-        logger.info("SPRINKLER %s: Started with %s objects (%sms)" % (self, len(qs), duration))
+        start_time = time()
         c.apply_async()
+        end_time = time()
+
+        duration = (end_time - start_time) * 1000
+        logger.info("SPRINKLER %s: Started with %s objects (%sms)" % (self, len(qs), duration))
 
     def finished(self, results):
         pass
