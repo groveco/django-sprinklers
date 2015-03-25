@@ -32,25 +32,25 @@ class SprinklerBase(object):
     def start(self):
         qs = self.get_queryset()
         if isinstance(qs, ValuesQuerySet):
-            c = chord(
-                (_async_subtask.s(obj['id'], self.__class__.__name__, self.kwargs) for obj in qs),
-                _sprinkler_finished_wrap.s(sprinkler=self)
-            )
+            ids = [obj['id'] for obj in qs]
         elif isinstance(qs, QuerySet):
-            c = chord(
-                (_async_subtask.s(obj.pk, self.__class__.__name__, self.kwargs) for obj in qs),
-                _sprinkler_finished_wrap.s(sprinkler=self)
-            )
+            ids = [obj.pk for obj in qs]
         else:
-            logger.error("SPRINKLER %s: Invalid queryset. Expected QuerySet of ValuesQuerySet, but got %s." % (self, type(qs)))
+            logger.error("SPRINKLER %s: Invalid queryset. Expected QuerySet or ValuesQuerySet, but got %s." % (self, type(qs)))
             return
+
+        c = chord(
+            (_async_subtask.s(i, self.__class__.__name__, self.kwargs) for i in ids),
+            _sprinkler_finished_wrap.s(sprinkler=self)
+        )
 
         start_time = time()
         c.apply_async()
         end_time = time()
 
         duration = (end_time - start_time) * 1000
-        logger.info("SPRINKLER %s: Started with %s objects (%sms)" % (self, len(qs), duration))
+        logger.info("SPRINKLER %s: Started with %s objects in %sms." % (self, len(qs), duration))
+        logger.info("SPRINKLER %s: Started with objects: %s" % (self, ids))
 
     def finished(self, results):
         pass
