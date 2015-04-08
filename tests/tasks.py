@@ -23,6 +23,8 @@ class SampleSprinkler(SprinklerBase):
         return DummyModel.objects.all()
 
     def subtask(self, obj):
+        if self.kwargs.get('raise_error') and obj.name == 'fail':
+            raise AttributeError("Oh noes!")
         obj.name = "Sprinkled!"
         obj.save()
         if self.kwargs.get('special_return'):
@@ -34,8 +36,12 @@ class SampleSprinkler(SprinklerBase):
 
     def finished(self, results):
         # Persist results to an external source (the database) so I can unit test this.
+        # Note that it writes the entire result obj as the name
         if self.kwargs.get('persist_results'):
             DummyModel(name="%s" % results).save()
+
+    def on_error(self, obj, e):
+        return False
 
 
 registry.register(SampleSprinkler)

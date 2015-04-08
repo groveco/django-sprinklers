@@ -76,3 +76,9 @@ class SprinklerTest(TransactionTestCase):
         d2.save()
         self._run(persist_results=True)
         self.assertEqual(DummyModel.objects.filter(name=str([d1.id, d2.id])).count(), 1)
+
+    def test_error_on_subtask_calls_on_error(self):
+        DummyModel(name="fail").save()
+        DummyModel(name="succeed").save()
+        self._run(raise_error=True, persist_results=True, special_return=True)
+        self.assertEqual(DummyModel.objects.filter(name=str([False, True])).count(), 1)

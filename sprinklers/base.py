@@ -66,6 +66,14 @@ class SprinklerBase(object):
         """ Do work on obj and return whatever results are needed."""
         raise NotImplementedError
 
+    def on_error(self, obj, e):
+        """ Called if an unexpected exception, e, occurs while running the subtask on obj.
+            Results from this function will be aggregated into the results passed to the
+            .finished() method. To emulate default Celery behavior, just reraise e here.
+            Note that raising an exception in subtask execution will prevent the chord from
+            ever firing its callback (though other subtasks will continue to execute)."""
+        raise e
+
     def _run_subtask(self, obj_pk):
         """Executes the sprinkle pipeline. Should not be overridden."""
         try:
@@ -78,6 +86,9 @@ class SprinklerBase(object):
             self.log("Object <%s - %s> does not exist." % (self.klass.__name__, obj_pk))
         except SubtaskValidationException as e:
             self.log("Validation failed for object %s: %s" % (obj, e))
+        except Exception as e:
+            self.log("Unexpected exception for object %s: %s" % (obj, e))
+            return self.on_error(obj, e)
 
     def _log_execution_step(self, fn, obj):
         fn_name = fn.__name__.split('.')[-1]

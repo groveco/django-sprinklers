@@ -95,6 +95,7 @@ The Sprinkler tests are a bit trickier to run that just 'manage.py test' because
 
 In order to run the tests you will need:
 
+0. Change CELERY_ALWAYS_EAGER = False in settings.py
 1. A local postgres server set up in line with the DB config in test.settings
 2. A running redis server with default localhost config (redis://localhost:6379/0)
 3. A running celery daemon/worker.
@@ -109,9 +110,9 @@ screen -d -S 'celery' -m python manage.py celeryd
 
 This will run each in the background, and you can 'screen -r redis' or 'screen -r celery' to view them (Ctrl-a-d to detach).
 
-If you are working on this project directly, remember to restart celery after code changes to django-sprinklers. Celery does not live reload!
+If you are working on this project directly, **remember to restart celery after code changes** to django-sprinklers. Celery does not live reload!
 
 ## FAQ
 
 - Q: Will this work on any iterable? Does it have to be a Django queryset?
-- A: It has to be a queryset. Sprinklers relies on some introspection to determine which model class to use for individual object retrieval.
+- A: It has to be a queryset (or a valuesqueryset). Sprinklers relies on some introspection to determine which model class to use for individual object retrieval.
