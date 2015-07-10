@@ -1,6 +1,7 @@
 from sprinklers.base import SprinklerBase, registry, SubtaskValidationException
 from tests.models import DummyModel
 from celery import task
+from traceback import format_exc
 
 
 @task
@@ -41,6 +42,7 @@ class SampleSprinkler(SprinklerBase):
             DummyModel(name="%s" % results).save()
 
     def on_error(self, obj, e):
+        print "Here's the error: " + format_exc()
         return False
 
 
