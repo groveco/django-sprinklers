@@ -1,6 +1,12 @@
 from celery import chord, current_app
 from registry import sprinkler_registry as registry
-from django.db.models.query import ValuesQuerySet, QuerySet
+from django.db.models.query import QuerySet
+
+try:
+    from django.db.models.query import ValuesQuerySet
+except ImportError:
+    ValuesQuerySet = None
+
 import logging
 from time import time
 
@@ -31,7 +37,7 @@ class SprinklerBase(object):
 
     def start(self):
         qs = self.get_queryset()
-        if isinstance(qs, ValuesQuerySet):
+        if ValuesQuerySet and isinstance(qs, ValuesQuerySet):
             ids = [obj['id'] for obj in qs]
         elif isinstance(qs, QuerySet):
             ids = [obj.pk for obj in qs]
