@@ -66,8 +66,9 @@ class SprinklerTest(TransactionTestCase):
 
     def test_validation_exception(self):
         DummyModel(name="foo").save()
-        self._run(fail=True)
+        self._run(fail=True, persist_results=True)
         self.assertTrue(DummyModel.objects.filter(name="foo").exists())
+        self.assertEqual(DummyModel.objects.filter(name=str(['v_fail'])).count(), 1)
 
     def test_default_return_value_for_subtask(self):
         d1 = DummyModel(name="qux")

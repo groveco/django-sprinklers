@@ -35,6 +35,9 @@ class SampleSprinkler(SprinklerBase):
         if self.kwargs.get('fail'):
             raise SubtaskValidationException
 
+    def on_validation_exception(self, obj, e):
+        return "v_fail"
+
     def finished(self, results):
         # Persist results to an external source (the database) so I can unit test this.
         # Note that it writes the entire result obj as the name

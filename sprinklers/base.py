@@ -59,7 +59,7 @@ class SprinklerBase(object):
         raise NotImplementedError
 
     def validate(self, obj):
-        """Should raise ActionValidationException if validation fails."""
+        """Should raise SubtaskValidationException if validation fails."""
         pass
 
     def subtask(self, obj):
@@ -74,6 +74,10 @@ class SprinklerBase(object):
             ever firing its callback (though other subtasks will continue to execute)."""
         raise e
 
+    def on_validation_exception(self, obj, e):
+        """ Called if validate raises a SubtaskValidationException."""
+        return None
+
     def _run_subtask(self, obj_pk):
         """Executes the sprinkle pipeline. Should not be overridden."""
         try:
@@ -86,6 +90,7 @@ class SprinklerBase(object):
             self.log("Object <%s - %s> does not exist." % (self.klass.__name__, obj_pk))
         except SubtaskValidationException as e:
             self.log("Validation failed for object %s: %s" % (obj, e))
+            return self.on_validation_exception(obj, e)
         except Exception as e:
             self.log("Unexpected exception for object %s: %s" % (obj, e))
             return self.on_error(obj, e)
