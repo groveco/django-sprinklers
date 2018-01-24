@@ -24,6 +24,7 @@ class SubtaskValidationException(Exception):
 
 
 class SprinklerBase(object):
+    subtask_queue = 'celery'
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -40,8 +41,11 @@ class SprinklerBase(object):
             return
 
         c = chord(
-            (_async_subtask.s(i, self.__class__.__name__, self.kwargs) for i in ids),
-            _sprinkler_finished_wrap.s(sprinkler=self)
+            (
+                _async_subtask.s(i, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
+                for i in ids
+            ),
+            _sprinkler_finished_wrap.s(sprinkler=self).set(queue=self.get_subtask_queue())
         )
 
         start_time = time()
@@ -65,6 +69,9 @@ class SprinklerBase(object):
     def subtask(self, obj):
         """ Do work on obj and return whatever results are needed."""
         raise NotImplementedError
+
+    def get_subtask_queue(self):
+        return self.subtask_queue
 
     def on_error(self, obj, e):
         """ Called if an unexpected exception, e, occurs while running the subtask on obj.
