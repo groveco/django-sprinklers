@@ -24,7 +24,7 @@ class SubtaskValidationException(Exception):
 
 
 class SprinklerBase(object):
-    subtask_queue = 'celery'
+    subtask_queue = current_app.conf.CELERY_DEFAULT_QUEUE
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
