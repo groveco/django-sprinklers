@@ -14,7 +14,8 @@ def _async_subtask(obj_pk, sprinkler_name, kwargs):
 
 
 @current_app.task()
-def _sprinkler_finished_wrap(results, sprinkler):
+def _sprinkler_finished_wrap(results, sprinkler_name, kwargs):
+    sprinkler = registry[sprinkler_name](**kwargs)
     sprinkler.log("Finished with results (length %s): %s" % (len(results), results))
     sprinkler.finished(results)
 
@@ -45,7 +46,7 @@ class SprinklerBase(object):
                 _async_subtask.s(i, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
                 for i in ids
             ),
-            _sprinkler_finished_wrap.s(sprinkler=self).set(queue=self.get_subtask_queue())
+            _sprinkler_finished_wrap.s(sprinkler_name=self.__class__.__name__, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
         )
 
         start_time = time()
