@@ -1,5 +1,5 @@
 from celery import chord, current_app
-from registry import sprinkler_registry as registry
+from .registry import sprinkler_registry as registry
 from django.db.models.query import QuerySet
 import logging
 from time import time
