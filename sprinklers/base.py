@@ -35,13 +35,7 @@ class SprinklerBase(object):
 
     def start(self):
         qs = self.get_queryset()
-        if qs and isinstance(qs[0], dict):  # A ValuesQuerySet (Django < 1.9) or a QuerySet of dict objects (Django 1.9+)
-            ids = [obj['id'] for obj in qs]
-        elif isinstance(qs, QuerySet):
-            ids = [obj.pk for obj in qs]
-        else:
-            self.log("Invalid queryset. Expected QuerySet or ValuesQuerySet, but got %s." % type(qs))
-            return
+        ids = [o['id'] if isinstance(o, dict) else o.id for o in qs]
 
         c = chord(
             (
@@ -56,7 +50,7 @@ class SprinklerBase(object):
         end_time = time()
 
         duration = (end_time - start_time) * 1000
-        self.log("Started with %s objects in %sms." % (len(qs), duration))
+        self.log("Started with %s objects in %sms." % (len(ids), duration))
         self.log("Started with objects: %s" % ids)
 
     def finished(self, results):
