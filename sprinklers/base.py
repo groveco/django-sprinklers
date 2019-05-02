@@ -26,6 +26,8 @@ class SubtaskValidationException(Exception):
 
 class SprinklerBase(object):
     subtask_queue = current_app.conf.CELERY_DEFAULT_QUEUE
+    # Task limit per chord, no limit by default
+    chord_size = None
     klass = None
 
     def __init__(self, **kwargs):
@@ -33,25 +35,43 @@ class SprinklerBase(object):
         if self.klass is None:
             self.klass = self.get_queryset().model
 
+    def split_queryset(self, queryset, chunk_size=chord_size):
+        chunk = []
+        for item in queryset:
+            if len(chunk) >= chunk_size:
+                yield chunk
+                chunk = [item]
+            else:
+                chunk.append(item)
+
+        yield chunk
+
     def start(self):
         qs = self.get_queryset()
-        ids = [o['id'] if isinstance(o, dict) else o.id for o in qs]
 
-        c = chord(
-            (
-                _async_subtask.s(i, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
-                for i in ids
-            ),
-            _sprinkler_finished_wrap.s(sprinkler_name=self.__class__.__name__, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
-        )
+        if self.chord_size is not None:
+            chunks = self.split_queryset(qs, self.chord_size)
+        else:
+            chunks = [qs]
 
-        start_time = time()
-        c.apply_async()
-        end_time = time()
+        for chunk in chunks:
+            ids = [o['id'] if isinstance(o, dict) else o.id for o in chunk]
 
-        duration = (end_time - start_time) * 1000
-        self.log("Started with %s objects in %sms." % (len(ids), duration))
-        self.log("Started with objects: %s" % ids)
+            c = chord(
+                (
+                    _async_subtask.s(i, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
+                    for i in ids
+                ),
+                _sprinkler_finished_wrap.s(sprinkler_name=self.__class__.__name__, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
+            )
+
+            start_time = time()
+            c.apply_async()
+            end_time = time()
+
+            duration = (end_time - start_time) * 1000
+            self.log("Started with %s objects in %sms." % (len(ids), duration))
+            self.log("Started with objects: %s" % ids)
 
     def finished(self, results):
         pass
