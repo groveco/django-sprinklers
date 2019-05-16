@@ -72,7 +72,7 @@ DATABASES = {
         'TEST': {
             'NAME': 'sprinklers',
         },
-        'USER': 'colin',
+        'USER': 'postgres',
         'HOST': 'localhost',
         'PORT': '5432',
     },

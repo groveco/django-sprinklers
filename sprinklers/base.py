@@ -42,7 +42,7 @@ class SprinklerBase(object):
     # Task limit per chord, no limit by default
     chord_size = None
     klass = None
-    shard_size = 100000
+    shard_size = 10000
     sharded = False
 
     def __init__(self, **kwargs):
