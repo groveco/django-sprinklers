@@ -1,6 +1,6 @@
 from django.test import TransactionTestCase
 from tests.models import DummyModel
-from tests.tasks import run_sample_sprinkler, SampleSprinkler
+from tests.tasks import run_sample_sprinkler, run_sharded_sprinkler, SampleSprinkler
 from django.conf import settings
 import time
 
@@ -13,9 +13,15 @@ class SprinklerTest(TransactionTestCase):
             time.sleep(2)
 
     def _run(self, **kwargs):
-        run_sample_sprinkler.delay(**kwargs)
+        r = run_sample_sprinkler.delay(**kwargs)
         if not settings.CELERY_ALWAYS_EAGER:
             time.sleep(2)
+
+    def _run_sharded(self, **kwargs):
+        r = run_sharded_sprinkler.delay(**kwargs)
+        if not settings.CELERY_ALWAYS_EAGER:
+            time.sleep(2)
+        return r.get()
 
     def test_objects_get_sprinkled(self):
         DummyModel(name="foo").save()
@@ -41,7 +47,7 @@ class SprinklerTest(TransactionTestCase):
         # This was a bigger issue in an earlier version of sprinklers, but it still makes me feel good
         # knowing that this tests pass and sprinklers will always refresh their querset when they run.
         cur_len = len(SampleSprinkler().get_queryset())
-        for i in xrange(cur_len + 5):
+        for i in range(cur_len + 5):
             DummyModel(name="foo").save()
 
         self._run()
@@ -83,3 +89,9 @@ class SprinklerTest(TransactionTestCase):
         DummyModel(name="succeed").save()
         self._run(raise_error=True, persist_results=True, special_return=True)
         self.assertEqual(DummyModel.objects.filter(name=str([False, True])).count(), 1)
+
+    def test_sharded_sprinkler(self):
+        for i in range(10):
+            DummyModel(name="sharded").save()
+        self._run_sharded(name="sharded")
+        self.assertEqual(DummyModel.objects.filter(name="sharded").count(), 0)
