@@ -69,7 +69,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'sprinklers',
-        'TEST_NAME': 'sprinklers',
+        'TEST': {
+            'NAME': 'sprinklers',
+        },
         'USER': 'postgres',
         'HOST': 'localhost',
         'PORT': '5432',
