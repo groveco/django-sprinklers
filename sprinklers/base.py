@@ -57,6 +57,8 @@ class SprinklerBase(object):
             else:
                 chunk.append(item)
 
+        yield chunk
+
     def start(self):
         qs = self.get_queryset()
 
