@@ -42,8 +42,6 @@ class SprinklerBase(object):
     # Task limit per chord, no limit by default
     chord_size = None
     klass = None
-    shard_size = 10000
-    sharded = False
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -59,70 +57,21 @@ class SprinklerBase(object):
             else:
                 chunk.append(item)
 
-    def shard_start(self, shard_id, from_pk=None, to_pk=None):
-        pks = self.get_queryset_pks(from_pk, to_pk)
-
-        c = chord(
-            (
-                _async_subtask.s(pk, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue()).set(queue=self.get_subtask_queue())
-                for pk in pks
-            ),
-            _sprinkler_shard_finished_wrap.s(sprinkler_name=self.__class__.__name__, shard_id=shard_id, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
-        )
-
-        start_time = time()
-        c.apply_async()
-        end_time = time()
-
-        duration = (end_time - start_time) * 1000
-        self.log(f"Started shard {shard_id} in {duration}ms.")
-
-        return shard_id
-
-    def shard_finished(self, shard_id, results):
-        pass
-
-    def get_queryset_pks(self, from_pk=None, to_pk=None):
-        queryset = self.get_queryset().only('pk').order_by('pk')
-
-        if from_pk is not None:
-            queryset = queryset.filter(pk__gt=from_pk)
-
-        if to_pk is not None:
-            queryset = queryset.filter(pk__lte=to_pk)
-
-        # values_list in django 1.11 is broken and will run out of memory when iterating over a large queryset, even with .iterator()
-        # the following code does basically the same thing as values_list, without running out of memory
-        db = queryset.db
-        compiler = queryset.query.get_compiler(db)
-        results = compiler.execute_sql(chunked_fetch=True)
-
-        for row in compiler.results_iter(results):
-            yield row[0]
-
-    def build_shards(self):
-        last_pk = None
-        next_pk = None
-
-        for i, pk in enumerate(self.get_queryset_pks(), 1):
-            if i % self.shard_size == 0:
-                last_pk = next_pk
-                next_pk = pk
-                yield uuid.uuid4(), last_pk, next_pk
-
-        yield uuid.uuid4(), next_pk, None
-
     def start(self):
-        if self.sharded:
-            shards = list(self.build_shards())
+        qs = self.get_queryset()
 
-            # the sharded sprinkler calls finished on output of shard_start for each shard, passing the shard ID,
-            # rather than the results of the completed shard tasks
+        if self.chord_size is not None:
+            chunks = self.split_queryset(qs, self.chord_size)
+        else:
+            chunks = [qs]
+
+        for chunk in chunks:
+            ids = [o['id'] if isinstance(o, dict) else o.id for o in chunk]
 
             c = chord(
                 (
-                    _async_shard_start.s(shard_id, from_pk, to_pk, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
-                    for shard_id, from_pk, to_pk in shards
+                    _async_subtask.s(i, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
+                    for i in ids
                 ),
                 _sprinkler_finished_wrap.s(sprinkler_name=self.__class__.__name__, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
             )
@@ -132,36 +81,8 @@ class SprinklerBase(object):
             end_time = time()
 
             duration = (end_time - start_time) * 1000
-            shard_ids = [shard[0] for shard in shards]
-            self.log(f"Started with {len(shards)} shards in {duration}ms.")
-            self.log(f"Started with shards: {[str(shard_id) for shard_id in shard_ids]}")
-            return shard_ids
-        else:
-            qs = self.get_queryset()
-
-            if self.chord_size is not None:
-                chunks = self.split_queryset(qs, self.chord_size)
-            else:
-                chunks = [qs]
-
-            for chunk in chunks:
-                ids = [o['id'] if isinstance(o, dict) else o.id for o in chunk]
-
-                c = chord(
-                    (
-                        _async_subtask.s(i, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
-                        for i in ids
-                    ),
-                    _sprinkler_finished_wrap.s(sprinkler_name=self.__class__.__name__, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
-                )
-
-                start_time = time()
-                c.apply_async()
-                end_time = time()
-
-                duration = (end_time - start_time) * 1000
-                self.log("Started with %s objects in %sms." % (len(ids), duration))
-                self.log("Started with objects: %s" % ids)
+            self.log("Started with %s objects in %sms." % (len(ids), duration))
+            self.log("Started with objects: %s" % ids)
 
     def finished(self, results):
         pass
@@ -221,3 +142,83 @@ class SprinklerBase(object):
 
     def log(self, msg):
         logger.info("SPRINKLER %s: %s" % (self, msg))
+
+class ShardedSprinkler(SprinklerBase):
+    shard_size = 100000
+
+    def start(self):
+        shards = list(self.build_shards())
+
+        # the sharded sprinkler calls finished on output of shard_start for each shard, passing the shard ID,
+        # rather than the results of the completed shard tasks
+
+        c = chord(
+            (
+                _async_shard_start.s(shard_id, from_pk, to_pk, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
+                for shard_id, from_pk, to_pk in shards
+            ),
+            _sprinkler_finished_wrap.s(sprinkler_name=self.__class__.__name__, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
+        )
+
+        start_time = time()
+        c.apply_async()
+        end_time = time()
+
+        duration = (end_time - start_time) * 1000
+        shard_ids = [shard[0] for shard in shards]
+        self.log(f"Started with {len(shards)} shards in {duration}ms.")
+        self.log(f"Started with shards: {[str(shard_id) for shard_id in shard_ids]}")
+        return shard_ids
+
+    def shard_start(self, shard_id, from_pk=None, to_pk=None):
+        pks = self.get_queryset_pks(from_pk, to_pk)
+
+        c = chord(
+            (
+                _async_subtask.s(pk, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue()).set(queue=self.get_subtask_queue())
+                for pk in pks
+            ),
+            _sprinkler_shard_finished_wrap.s(sprinkler_name=self.__class__.__name__, shard_id=shard_id, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
+        )
+
+        start_time = time()
+        c.apply_async()
+        end_time = time()
+
+        duration = (end_time - start_time) * 1000
+        self.log(f"Started shard {shard_id} in {duration}ms.")
+
+        return shard_id
+
+    def shard_finished(self, shard_id, results):
+        pass
+
+    def get_queryset_pks(self, from_pk=None, to_pk=None):
+        queryset = self.get_queryset().only('pk').order_by('pk')
+
+        if from_pk is not None:
+            queryset = queryset.filter(pk__gt=from_pk)
+
+        if to_pk is not None:
+            queryset = queryset.filter(pk__lte=to_pk)
+
+        # values_list in django 1.11 is broken and will run out of memory when iterating over a large queryset, even with .iterator()
+        # the following code does basically the same thing as values_list, without running out of memory
+        db = queryset.db
+        compiler = queryset.query.get_compiler(db)
+        results = compiler.execute_sql(chunked_fetch=True)
+
+        for row in compiler.results_iter(results):
+            yield row[0]
+
+    def build_shards(self):
+        last_pk = None
+        next_pk = None
+
+        for i, pk in enumerate(self.get_queryset_pks(), 1):
+            if i % self.shard_size == 0:
+                last_pk = next_pk
+                next_pk = pk
+                yield uuid.uuid4(), last_pk, next_pk
+
+        yield uuid.uuid4(), next_pk, None

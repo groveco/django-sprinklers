@@ -1,4 +1,4 @@
-from sprinklers.base import SprinklerBase, registry, SubtaskValidationException
+from sprinklers.base import SprinklerBase, ShardedSprinkler, registry, SubtaskValidationException
 from tests.models import DummyModel
 from celery import task
 from traceback import format_exc
@@ -53,8 +53,7 @@ class SampleSprinkler(SprinklerBase):
 
 registry.register(SampleSprinkler)
 
-class ShardedSampleSprinkler(SprinklerBase):
-    sharded = True
+class ShardedSampleSprinkler(ShardedSprinkler):
     shard_size = 2
 
     def get_queryset(self):
