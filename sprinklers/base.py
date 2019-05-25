@@ -21,7 +21,7 @@ def _async_shard_start(shard_id, from_pk, to_pk, sprinkler_name, kwargs):
 
 
 @current_app.task()
-def _sprinkler_shard_finished_wrap(shard_id, results, sprinkler_name, kwargs):
+def _sprinkler_shard_finished_wrap(results, shard_id, sprinkler_name, kwargs):
     sprinkler = registry[sprinkler_name](**kwargs)
     sprinkler.log(f"shard finished: {shard_id}")
     sprinkler.shard_finished(shard_id, results)
@@ -177,7 +177,7 @@ class ShardedSprinkler(SprinklerBase):
 
         c = chord(
             (
-                _async_subtask.s(pk, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue()).set(queue=self.get_subtask_queue())
+                _async_subtask.s(pk, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
                 for pk in pks
             ),
             _sprinkler_shard_finished_wrap.s(sprinkler_name=self.__class__.__name__, shard_id=shard_id, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
