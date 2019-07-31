@@ -125,8 +125,9 @@ class SprinklerBase(object):
     def log(self, msg):
         logger.info("SPRINKLER %s: %s" % (self, msg))
 
+
 class ShardedSprinkler(SprinklerBase):
-    shard_size = 20000
+    shard_size = app_settings.SPRINKLER_DEFAULT_SHARD_SIZE
 
     def start(self):
         shards = list(self.build_shards())
