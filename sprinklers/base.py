@@ -1,7 +1,6 @@
 from . import app_settings
-from celery import chord, current_app
+from celery import chord, current_app, Task
 from .registry import sprinkler_registry as registry
-from django.db.models.query import QuerySet
 import logging
 import uuid
 from time import time
@@ -9,10 +8,35 @@ from time import time
 logger = logging.getLogger('')
 
 
-@current_app.task()
-def _async_subtask(obj_pk, sprinkler_name, kwargs):
-    sprinkler = registry[sprinkler_name](**kwargs)
-    return sprinkler._run_subtask(obj_pk)
+def async_subtask(obj_pk, sprinkler_name, kwargs):
+    """
+    async_subtask -- inner implementation of :func:`_async_subtask`
+
+    Useful for overriding the task decoration on the default implementation to
+    change the ``rate_limit``, ``name``, and other registered properties of
+    :class:`celery.Task` in dependent modules:
+
+    >>> from django.contrib.auth.models import User
+    >>> from celery import current_app
+    >>> from sprinklers.base import async_subtask, SprinklerBase
+    >>> one_per_minute = current_app.task(
+    ...     async_subtask,
+    ...     rate_limit='1/m',
+    ...     name='one_per_minute',
+    ... )
+    >>> class SomeSprinkler(SprinklerBase):
+    ...     _async_subtask = one_per_minute
+    ...     def subtask(self, obj):
+    ...         print(obj)
+    ...     def get_queryset(self):
+    ...         return User.objects.all()[0:5]
+    ...
+    >>> SomeSprinkler().start()
+    """
+    return registry[sprinkler_name](**kwargs)._run_subtask(obj_pk)
+
+
+_async_subtask = current_app.task(async_subtask)
 
 
 @current_app.task()
@@ -26,6 +50,7 @@ def _sprinkler_shard_finished_wrap(results, shard_id, sprinkler_name, kwargs):
     sprinkler = registry[sprinkler_name](**kwargs)
     sprinkler.log(f"shard finished: {shard_id}")
     sprinkler.shard_finished(shard_id, results)
+
 
 @current_app.task()
 def _sprinkler_finished_wrap(results, sprinkler_name, kwargs):
@@ -51,9 +76,18 @@ class SprinklerBase(object):
         qs = self.get_queryset()
         ids = [o['id'] if isinstance(o, dict) else o.id for o in qs]
 
+        async_subtask = (
+            self._async_subtask
+            if isinstance(getattr(self, '_async_subtask', None), Task)
+            else _async_subtask
+        )
+
         c = chord(
             (
-                _async_subtask.s(i, self.__class__.__name__, self.kwargs).set(queue=self.get_subtask_queue())
+                # .s is shorthand for .signature()
+                async_subtask
+                .s(i, self.__class__.__name__, self.kwargs)
+                .set(queue=self.get_subtask_queue())
                 for i in ids
             ),
             _sprinkler_finished_wrap.s(sprinkler_name=self.__class__.__name__, kwargs=self.kwargs).set(queue=self.get_subtask_queue())
