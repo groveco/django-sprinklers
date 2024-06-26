@@ -132,6 +132,7 @@ class SprinklerBase(object):
 
     def _run_subtask(self, obj_pk):
         """Executes the sprinkle pipeline. Should not be overridden."""
+        obj = None
         try:
             obj = self.klass.objects.get(pk=obj_pk)
             self._log_execution_step(self.validate, obj)
@@ -144,8 +145,10 @@ class SprinklerBase(object):
             self.log("Validation failed for object %s: %s" % (obj, e))
             return self.on_validation_exception(obj, e)
         except Exception as e:
-            self.log("Unexpected exception for object %s: %s" % (obj, e))
-            return self.on_error(obj, e)
+            if obj is not None:
+                self.log("Unexpected exception for object %s: %s" % (obj, e))
+                return self.on_error(obj, e)
+            raise e
 
     def _log_execution_step(self, fn, obj):
         fn_name = fn.__name__.split('.')[-1]
